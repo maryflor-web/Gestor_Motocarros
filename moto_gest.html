@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MotoGest · Gestión de Motocarros</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #e6eef6; --sidebar: #123476; --sidebar-hover: #1c448e;
+    --accent: #4071b1; --accent-2: #123476;
+    --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+    --text: #1e293b; --muted: #64748b; --border: #cddced; --card: #ffffff;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; }
+  
+  .sidebar { width:240px; background:var(--sidebar); color:#cddced; padding:20px 0; display:flex; flex-direction:column; position:fixed; height:100vh; overflow-y:auto; z-index:10; }
+  .sidebar h1 { font-size:1.2rem; padding:0 20px 20px; color:#fff; display:flex; align-items:center; gap:8px; border-bottom:1px solid #1c448e; margin-bottom:12px; }
+  .sidebar h1 span { color:#85acd5; }
+  .nav-item { padding:11px 20px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:.92rem; border-left:3px solid transparent; transition:all .15s; }
+  .nav-item:hover { background:var(--sidebar-hover); color:#fff; }
+  .nav-item.active { background:var(--sidebar-hover); color:#fff; border-left-color:#85acd5; }
+  .nav-item .ico { font-size:1.1rem; width:20px; text-align:center; }
+  
+  .main { flex:1; margin-left:240px; padding:24px 32px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+  .topbar h2 { font-size:1.5rem; color:var(--sidebar); }
+  .topbar-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  
+  .btn { padding:9px 16px; border:none; border-radius:8px; cursor:pointer; font-size:.88rem; font-weight:500; display:inline-flex; align-items:center; gap:6px; transition:all .15s; font-family:inherit; }
+  .btn-primary { background:var(--accent); color:#fff; } .btn-primary:hover { background:var(--accent-2); }
+  .btn-success { background:var(--success); color:#fff; } .btn-success:hover { background:#059669; }
+  .btn-danger { background:var(--danger); color:#fff; } .btn-danger:hover { background:#dc2626; }
+  .btn-warning { background:var(--warning); color:#fff; } .btn-warning:hover { background:#d97706; }
+  .btn-ghost { background:#fff; color:var(--text); border:1px solid var(--border); } .btn-ghost:hover { background:var(--bg); border-color:#85acd5; }
+  .btn-sm { padding:5px 10px; font-size:.8rem; }
+  
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+  .kpi { background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--border); box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .kpi .label { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .kpi .value { font-size:1.7rem; font-weight:700; color:var(--sidebar); }
+  .kpi .value.danger { color:var(--danger); } .kpi .value.success { color:var(--success); }
+  .kpi .sub { font-size:.78rem; color:var(--muted); margin-top:4px; }
+  .card { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:20px; margin-bottom:24px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .card-header h3 { font-size:1.1rem; color:var(--sidebar); }
+  
+  table { width:100%; border-collapse:collapse; font-size:.86rem; }
+  thead th { text-align:left; padding:10px 12px; background:var(--bg); color:var(--sidebar); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border); }
+  tbody td { padding:10px 12px; border-bottom:1px solid var(--border); }
+  tbody tr:hover { background:var(--bg); }
+  tbody tr:last-child td { border-bottom:none; }
+  .empty { text-align:center; padding:30px; color:var(--muted); font-size:.9rem; }
+  
+  .badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:600; }
+  .badge-success { background:#d1fae5; color:#065f46; } .badge-danger { background:#fee2e2; color:#991b1b; }
+  .badge-warning { background:#fef3c7; color:#92400e; } .badge-muted { background:#e2e8f0; color:#475569; }
+  .badge-info { background:#dbeafe; color:#1e40af; }
+  
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .text-danger { color:var(--danger); font-weight:600; } .text-success { color:var(--success); font-weight:600; }
+  .text-muted { color:var(--muted); }
+  
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .form-group { display:flex; flex-direction:column; gap:5px; }
+  .form-group.full { grid-column:span 2; }
+  .form-group label { font-size:.8rem; font-weight:500; color:var(--sidebar); }
+  input, select, textarea { padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:.9rem; font-family:inherit; outline:none; transition:border .15s; background:#fff; color:var(--text); }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(64,113,177,.15); }
+  textarea { resize:vertical; min-height:60px; }
+  
+  .checkbox-row { display:flex; flex-direction:row; align-items:center; gap:8px; padding-top:20px; }
+  .checkbox-row input { width:22px; height:22px; cursor:pointer; accent-color:var(--accent); }
+  .checkbox-row label { font-size:.95rem; font-weight:500; cursor:pointer; color:var(--sidebar); }
+  
+  .modal-overlay { position:fixed; inset:0; background:rgba(18,52,118,.6); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:#fff; border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; padding:24px; }
+  .modal.modal-wide { max-width:900px; }
+  .modal h3 { margin-bottom:18px; color:var(--sidebar); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+  
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .toolbar input[type="date"] { max-width:180px; }
+  .search { flex:1; max-width:280px; }
+  
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--sidebar); color:#fff; padding:12px 20px; border-radius:10px; font-size:.88rem; opacity:0; transform:translateY(20px); transition:all .25s; pointer-events:none; z-index:200; max-width:360px; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  .toast.success { background:var(--success); } .toast.error { background:var(--danger); }
+  
+  .caja-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .denom-row { display:grid; grid-template-columns:80px 1fr 100px; gap:10px; align-items:center; padding:6px 0; }
+  .denom-row .denom { font-weight:600; font-size:.9rem; color:var(--sidebar); }
+  .denom-row input { padding:6px 10px; text-align:right; }
+  .denom-row .subtotal { text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }
+  .denom-title { font-size:.85rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:10px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  
+  .alert { padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:.9rem; line-height:1.5; }
+  .alert-success { background:#d1fae5; border:1px solid #10b981; color:#065f46; }
+  .alert-danger { background:#fee2e2; border:1px solid #ef4444; color:#991b1b; }
+  .alert-warning { background:#fef3c7; border:1px solid #f59e0b; color:#92400e; }
+  .alert-info { background:#dbeafe; border:1px solid #3b82f6; color:#1e40af; }
+  
+  .view { display:none; } .view.active { display:block; }
+  .table-wrap { overflow-x:auto; }
+  .lock-icon { color:var(--muted); margin-right:4px; }
+  
+  /* Registro rápido */
+  .quick-reg-row { display:grid; grid-template-columns: 240px 100px 80px 80px 120px; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .quick-reg-row .qr-name { font-size:.88rem; }
+  .quick-reg-row .qr-moto { font-size:.8rem; color:var(--muted); }
+  .quick-reg-row input[type="checkbox"] { width:20px; height:20px; accent-color:var(--accent); cursor:pointer; }
+  .quick-reg-row input[type="number"] { padding:6px 8px; font-size:.85rem; text-align:right; }
+  .quick-reg-header { font-weight:600; color:var(--sidebar); font-size:.75rem; text-transform:uppercase; letter-spacing:.4px; background:var(--bg); padding:8px; border-radius:6px; margin-bottom:8px; }
+  
+  @media (max-width:900px) {
+    .sidebar { width:64px; } .sidebar h1 span, .nav-item .txt { display:none; }
+    .sidebar h1 { padding:0 0 20px; justify-content:center; }
+    .nav-item { justify-content:center; padding:12px 0; }
+    .main { margin-left:64px; padding:16px; }
+    .form-grid, .caja-grid { grid-template-columns:1fr; }
+    .form-group.full { grid-column:span 1; }
+    .quick-reg-row { grid-template-columns: 1fr 60px 60px 60px 90px; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <h1>🛺 Moto<span>Gest</span></h1>
+  <div class="nav-item active" data-view="dashboard"><span class="ico">📊</span><span class="txt">Dashboard</span></div>
+  <div class="nav-item" data-view="motokares"><span class="ico">🛺</span><span class="txt">Motokares</span></div>
+  <div class="nav-item" data-view="choferes"><span class="ico">👤</span><span class="txt">Choferes</span></div>
+  <div class="nav-item" data-view="registros"><span class="ico">📅</span><span class="txt">Registro Diario</span></div>
+  <div class="nav-item" data-view="cargos"><span class="ico">💰</span><span class="txt">Cargos Adicionales</span></div>
+  <div class="nav-item" data-view="mantenimientos"><span class="ico">🔧</span><span class="txt">Mantenimiento</span></div>
+  <div class="nav-item" data-view="caja"><span class="ico">🧾</span><span class="txt">Cierre de Caja</span></div>
+  <div style="margin-top:auto">
+    <div class="nav-item" data-view="configuracion"><span class="ico">⚙️</span><span class="txt">Configuración</span></div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <div class="kpi-grid" id="kpi-grid"></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>⚡ Acciones rápidas</h3>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="openRegistroRapido()">✅ Registrar cobros de hoy</button>
+        <button class="btn btn-ghost" onclick="switchView('choferes')">👤 Ver deudas por chofer</button>
+        <button class="btn btn-ghost" onclick="switchView('caja')">🧾 Ir a Cierre de Caja</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Estado de cuenta por chofer</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Chofer</th><th>Motokar</th><th class="num">Feria pend.</th><th class="num">Cochera pend.</th><th class="num">Cargos pend.</th><th class="num">Abonos</th><th class="num">Total deuda</th><th>Estado</th></tr></thead>
+        <tbody id="tbl-saldos"></tbody>
+      </table></div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Resumen de hoy</h3></div><div class="kpi-grid" id="kpi-hoy"></div></div>
+  </div>
+
+  <!-- MOTOKARES -->
+  <div class="view" id="view-motokares">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openMotokarModal()">➕ Nuevo Motokar</button>
+      <input class="search" type="text" placeholder="Buscar por placa, marca..." oninput="renderMotokares(this.value)">
+    </div>
+    <div class="card table-wrap"><table>
+      <thead><tr><th>ID</th><th>N°</th><th>Color</th><th>Marca</th><th>Placa</th><th>SOAT</th><th>Estado</th><th>Observación</th><th>Acciones</th></tr></thead>
+      <tbody id="tbl-motokares"></tbody>
+    </table></div>
+  </div>
+
+  <!-- CHOFERES -->
+  <div class="view" id="view-choferes">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openChoferModal()">➕ Nuevo Chofer</button>
+      <input class="search" type="text" placeholder="Buscar por nombre, DNI..." oninput="renderChoferes(this.value)">
+    </div>
+    <div class="card table-wrap"><table>
+      <thead><tr><th>ID</th><th>DNI</th><th>Nombre</th><th>Celular</th><th>Motokar</th><th class="num">Saldo deudor</th><th>Acciones</th></tr></thead>
+      <tbody id="tbl-choferes"></tbody>
+    </table></div>
+  </div>
+
+  <!-- REGISTRO DIARIO -->
+  <div class="view" id="view-registros">
+    <div id="reg-alerta-cerrado"></div>
+    <div class="kpi-grid" id="kpi-registros-hoy"></div>
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openRegistroRapido()">⚡ Registro rápido</button>
+      <button class="btn btn-ghost" onclick="openRegistroModal()">➕ Registro individual</button>
+      <input type="date" id="filtro-fecha-reg" onchange="renderRegistros()">
+      <button class="btn btn-ghost" onclick="document.getElementById('filtro-fecha-reg').value=''; renderRegistros()">Ver todos</button>
+    </div>
+    <div class="card table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Chofer</th><th>Motokar</th><th class="num">Feria</th><th>Pago</th><th class="num">Cochera</th><th>Pago</th><th class="num">Debe</th><th class="num">Adicional</th><th class="num">Abono</th><th class="num">Aceite</th><th class="num">Repuestos</th><th>Observación</th><th>Acciones</th></tr></thead>
+      <tbody id="tbl-registros"></tbody>
+    </table></div>
+  </div>
+
+  <!-- CARGOS -->
+  <div class="view" id="view-cargos">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openCargoModal()">➕ Nuevo Cargo</button>
+      <button class="btn btn-success" onclick="openAbonoModal()">💵 Registrar Abono</button>
+    </div>
+    <div class="card table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Chofer</th><th>Concepto</th><th class="num">Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody id="tbl-cargos"></tbody>
+    </table></div>
+    <div class="card">
+      <div class="card-header"><h3>💵 Abonos registrados</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fecha</th><th>Chofer</th><th>Concepto</th><th class="num">Monto</th><th>Acciones</th></tr></thead>
+        <tbody id="tbl-abonos"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- MANTENIMIENTO -->
+  <div class="view" id="view-mantenimientos">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openMantenimientoModal()">➕ Nuevo Mantenimiento</button>
+    </div>
+    <div class="card table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Motokar</th><th>Chofer</th><th class="num">Aceite</th><th class="num">Repuestos</th><th>Observación</th><th class="num">Adicional</th><th>Acciones</th></tr></thead>
+      <tbody id="tbl-mantenimientos"></tbody>
+    </table></div>
+  </div>
+
+  <!-- CAJA / CIERRE DE JORNADA -->
+  <div class="view" id="view-caja">
+    <div class="toolbar">
+      <input type="date" id="caja-fecha" onchange="renderCaja()">
+      <span id="caja-estado"></span>
+    </div>
+    <div id="caja-alerta-cerrado"></div>
+    <div class="kpi-grid" id="kpi-caja"></div>
+    <div class="caja-grid">
+      <div class="card">
+        <div class="card-header"><h3>💵 Conteo de efectivo</h3></div>
+        <div class="denom-title">Monedas</div><div id="denoms-monedas"></div>
+        <div class="denom-title">Billetes</div><div id="denoms-billetes"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>📱 Yape / Transferencias</h3><button class="btn btn-primary btn-sm" id="btn-add-yape" onclick="addYapeRow()">+ Agregar</button></div>
+        <div id="yape-list"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>📋 Resumen del día</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Concepto</th><th class="num">Monto</th></tr></thead>
+        <tbody id="tbl-caja-resumen"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>🔒 Cierre de jornada</h3></div>
+      <p class="text-muted" style="margin-bottom:16px;font-size:.9rem">
+        Al cerrar la jornada se generará un reporte Excel con todos los movimientos del día y un respaldo JSON completo del sistema. Después del cierre, los movimientos de ese día quedarán bloqueados.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" id="btn-cerrar" onclick="cerrarJornada()">✅ Cerrar jornada y exportar</button>
+        <button class="btn btn-warning" id="btn-reabrir" onclick="reabrirJornada()" style="display:none">🔓 Reabrir día</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIGURACIÓN -->
+  <div class="view" id="view-configuracion">
+    <div class="card">
+      <div class="card-header"><h3>💾 Respaldo y restauración</h3></div>
+      <p class="text-muted" style="margin-bottom:16px;font-size:.9rem;line-height:1.5">
+        Descarga un respaldo completo de todos los datos del sistema (motokares, choferes, registros, cargos, abonos, cierres). Si algo ocurre con la memoria del navegador, puedes restaurar la información cargando ese archivo.
+      </p>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="exportJSON()">📥 Descargar respaldo JSON</button>
+        <label class="btn btn-ghost" style="cursor:pointer">
+          📤 Importar respaldo
+          <input type="file" accept=".json,application/json" onchange="importJSON(event)" style="display:none">
+        </label>
+        <button class="btn btn-ghost" onclick="exportAll()">📊 Exportar todo a Excel</button>
+      </div>
+      <div id="config-info" style="margin-top:16px;font-size:.88rem;color:var(--muted);line-height:1.7"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>📋 Historial de cierres</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fecha</th><th>Cerrado el</th><th class="num">Esperado</th><th class="num">Cobrado</th><th class="num">Pendiente</th><th class="num">Caja</th><th class="num">Diferencia</th><th>Acciones</th></tr></thead>
+        <tbody id="tbl-historial-cierres"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="border-color:#fca5a5">
+      <div class="card-header"><h3 style="color:var(--danger)">⚠️ Zona de peligro</h3></div>
+      <p class="text-muted" style="margin-bottom:16px;font-size:.9rem">
+        Esta acción borrará todos los datos del sistema. Asegúrate de haber descargado un respaldo antes de continuar.
+      </p>
+      <button class="btn btn-danger" onclick="resetData()">🔄 Reiniciar todos los datos</button>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modal"><div class="modal" id="modal-content"><h3 id="modal-title">Título</h3><form id="modal-form"></form></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+const STORAGE_KEY = 'motogest_v2';
+let state = { 
+  motokares:[], choferes:[], registros:[], cargos:[], abonos:[], mantenimientos:[], caja:[], cierres:[], 
+  config:{feriaDefault:25, cocheraDefault:3} 
+};
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) { try { state = JSON.parse(raw); } catch(e){} }
+  // Migración / valores por defecto
+  if (!state.abonos) state.abonos = [];
+  if (!state.cierres) state.cierres = [];
+  if (!state.mantenimientos) state.mantenimientos = [];
+  if (!state.caja) state.caja = [];
+  if (!state.config) state.config = { feriaDefault:25, cocheraDefault:3 };
+  if (!state.motokares.length && !state.choferes.length) { seed(); save(); }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function seed() {
+  state.motokares = [
+    ['MTK_01','ROJO/PLATA','HONDA','8740-OL'],['MTK_02','ROJO/PLATA','HONDA','2892-DD'],
+    ['MTK_03','AZUL/PLATA','ZONGSHEN','7200-XS'],['MTK_04','ROJO/PLATA','HONDA','9061-0L'],
+    ['MTK_05','AZUL/PLATA','HONDA','9357-8L'],['MTK_06','AZUL/PLATA','HONDA','7362-NB'],
+    ['MTK_07','AZUL/PLATA','HONDA','8590-CL'],['MTK_08','AZUL/PLATA','HONDA','7965-0L'],
+    ['MTK_09','AZUL/PLATA','HONDA','9196-AL'],['MTK_10','AZUL/PLATA','HONDA','1164-UB'],
+    ['MTK_11','AZUL/PLATA','HONDA','6198-AL'],['MTK_12','AZUL/PLATA','HONDA','6042-JA'],
+    ['MTK_13','AZUL/PLATA','HONDA','DAVID']
+  ].map((m,i) => ({id:m[0], num:i+1, color:m[1], marca:m[2], placa:m[3], soat:'', observacion:'', estado:'activo'}));
+  
+  state.choferes = [
+    ['C_001','46204506','MANUEL FLORES BALSECA','997226207','TUPAC AMARUC 154','NO'],
+    ['C_002','44737789','MIGUEL ANGEL VARGAS SANDI','905530279','CALLE LOS ROSALES MZ B LOTE 15 A.A.H.H.','NO'],
+    ['C_003','80394560','ELEMER GARCIA CANAYO','916707875','MICAELA BASTIDAS 598','NO'],
+    ['C_004','','JESUS MACEDO BARDALES','','','NO'],
+    ['C_005','49002775','CELIS CANAYO MACADO','947818813','PSJ. LOS LIBERTADORES MZ. H LT. 3','NO'],
+    ['C_006','05385941','FITZGERALD ALVAN MANIHUARI','901129388','AV DEL EJERCITO 28C','NO'],
+    ['C_007','05252600','MANUEL DEL AGUILA VELA','935548785','PSJ. 01 DE ABRIL 162',''],
+    ['C_008','46506471','NEIL SHELMAN ALVAN BERNALES','929395537','GONZALES VIGIL MZA O LT 1C','M-46506471'],
+    ['C_009','45774505','ABEL VILLANUEVA NOLORBE','930238770','CALLE A MZ D LT 19 URB TELLO','NO'],
+    ['C_010','41578554','WILLY SIMA TELLO','976320141','ELICEO REATEGUI 05','YM-41578554'],
+    ['C_011','05356610','JAIME LUIS PACAYA CANAYO','918167231','CALLE LAS MARGARITAS S/N','NO'],
+    ['C_012','47393793','MOISES FLORES TORRES','918167231','',''],
+    ['C_013','','MANUEL FLORES BALSECA','','',''],
+    ['C_014','','DAVID','','','']
+  ].map(c => ({id:c[0], dni:c[1], nombre:c[2], celular:c[3], direccion:c[4], licencia:c[5], fechaInicio:'', observaciones:'', motokarId:''}));
+}
+
+// ===== HELPERS =====
+const fmt = n => new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN',minimumFractionDigits:2}).format(Number(n)||0);
+const today = () => new Date().toISOString().slice(0,10);
+const uid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg, type='') { const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + type; setTimeout(() => t.className = 'toast ' + type, 3000); }
+function choferNombre(id) { const c = state.choferes.find(x => x.id === id); return c ? c.nombre : '—'; }
+function motokarLabel(id) { const m = state.motokares.find(x => x.id === id); return m ? m.placa + ' (' + m.id + ')' : '—'; }
+function isCerrado(fecha) { return (state.cierres||[]).some(c => c.fecha === fecha); }
+function cierreFor(fecha) { return (state.cierres||[]).find(c => c.fecha === fecha); }
+
+// ===== SALDO =====
+function saldoChofer(choferId) {
+  let feriaPend=0, cocheraPend=0, cargosPend=0, debeExtra=0, adicional=0, abonos=0;
+  state.registros.filter(r => r.choferId === choferId).forEach(r => {
+    if (!r.pagoFeria) feriaPend += Number(r.feria)||0;
+    if (!r.pagoCochera) cocheraPend += Number(r.cochera)||0;
+    debeExtra += Number(r.debe)||0;
+    adicional += Number(r.adicional)||0;
+    abonos += Number(r.abono)||0;
+  });
+  state.cargos.filter(c => c.choferId === choferId && !c.pagado).forEach(c => { cargosPend += Number(c.monto)||0; });
+  state.abonos.filter(a => a.choferId === choferId).forEach(a => { abonos += Number(a.monto)||0; });
+  return { feriaPend, cocheraPend, cargosPend, debeExtra, adicional, abonos, 
+           total: feriaPend + cocheraPend + cargosPend + debeExtra + adicional - abonos };
+}
+
+function movimientosChofer(choferId) {
+  const movs = [];
+  state.registros.filter(r => r.choferId === choferId).forEach(r => {
+    const f = Number(r.feria)||0, c = Number(r.cochera)||0;
+    if (f) movs.push({ fecha: r.fecha, concepto: 'Feria', cargo: f, abono: r.pagoFeria ? f : 0, ref: 'registro' });
+    if (c) movs.push({ fecha: r.fecha, concepto: 'Cochera', cargo: c, abono: r.pagoCochera ? c : 0, ref: 'registro' });
+    if (Number(r.debe)) movs.push({ fecha: r.fecha, concepto: 'Deuda extra', cargo: Number(r.debe), abono: 0, ref: 'registro' });
+    if (Number(r.adicional)) movs.push({ fecha: r.fecha, concepto: 'Cargo adicional', cargo: Number(r.adicional), abono: 0, ref: 'registro' });
+    if (Number(r.abono)) movs.push({ fecha: r.fecha, concepto: 'Abono (registro diario)', cargo: 0, abono: Number(r.abono), ref: 'abono' });
+  });
+  state.cargos.filter(c => c.choferId === choferId).forEach(c => {
+    movs.push({ fecha: c.fecha, concepto: c.concepto, cargo: Number(c.monto)||0, abono: c.pagado ? Number(c.monto)||0 : 0, ref: 'cargo' });
+  });
+  state.abonos.filter(a => a.choferId === choferId).forEach(a => {
+    movs.push({ fecha: a.fecha, concepto: a.concepto || 'Abono', cargo: 0, abono: Number(a.monto)||0, ref: 'abono' });
+  });
+  movs.sort((a,b) => a.fecha.localeCompare(b.fecha));
+  return movs;
+}
+
+// ===== NAV =====
+function switchView(name) {
+  $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+  $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  const titles = { dashboard:'Dashboard', motokares:'Motokares', choferes:'Choferes', registros:'Registro Diario', cargos:'Cargos y Abonos', mantenimientos:'Mantenimiento', caja:'Cierre de Caja', configuracion:'Configuración' };
+  $('#page-title').textContent = titles[name] || name;
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'motokares') renderMotokares();
+  if (name === 'choferes') renderChoferes();
+  if (name === 'registros') renderRegistros();
+  if (name === 'cargos') { renderCargos(); renderAbonos(); }
+  if (name === 'mantenimientos') renderMantenimientos();
+  if (name === 'caja') renderCaja();
+  if (name === 'configuracion') renderConfiguracion();
+}
+
+// ===== DASHBOARD =====
+function renderDashboard() {
+  const deudaTotal = state.choferes.reduce((s,c) => s + Math.max(0, saldoChofer(c.id).total), 0);
+  const hoy = today();
+  const regHoy = state.registros.filter(r => r.fecha === hoy);
+  const cobradoHoy = regHoy.reduce((s,r) => s + (r.pagoFeria?Number(r.feria)||0:0) + (r.pagoCochera?Number(r.cochera)||0:0), 0);
+  const estadoHoy = isCerrado(hoy) 
+    ? '<span class="badge badge-success">Cerrado</span>' 
+    : '<span class="badge badge-warning">Abierto</span>';
+  
+  $('#kpi-grid').innerHTML = `
+    <div class="kpi"><div class="label">Motokares</div><div class="value">${state.motokares.length}</div><div class="sub">Unidades registradas</div></div>
+    <div class="kpi"><div class="label">Choferes</div><div class="value">${state.choferes.length}</div><div class="sub">Conductores registrados</div></div>
+    <div class="kpi"><div class="label">Deuda total</div><div class="value danger">${fmt(deudaTotal)}</div><div class="sub">Por cobrar a choferes</div></div>
+    <div class="kpi"><div class="label">Cobrado hoy</div><div class="value success">${fmt(cobradoHoy)}</div><div class="sub">Estado del día: ${estadoHoy}</div></div>`;
+    
+  const rows = state.choferes.map(c => ({c, s: saldoChofer(c.id)})).sort((a,b) => b.s.total - a.s.total);
+  $('#tbl-saldos').innerHTML = rows.length ? rows.map(({c,s}) => `
+    <tr><td><strong>${esc(c.nombre)}</strong><br><span class="text-muted" style="font-size:.75rem">${c.id}</span></td>
+      <td>${c.motokarId ? esc(motokarLabel(c.motokarId)) : '<span class="text-muted">Sin asignar</span>'}</td>
+      <td class="num">${fmt(s.feriaPend)}</td><td class="num">${fmt(s.cocheraPend)}</td>
+      <td class="num">${fmt(s.cargosPend + s.debeExtra + s.adicional)}</td>
+      <td class="num text-success">${s.abonos ? '−' + fmt(s.abonos) : '—'}</td>
+      <td class="num ${s.total>0?'text-danger':s.total<0?'text-success':''}">${fmt(s.total)}</td>
+      <td>${s.total>0?'<span class="badge badge-danger">Con deuda</span>':s.total<0?'<span class="badge badge-success">A favor</span>':'<span class="badge badge-success">Al día</span>'}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No hay choferes registrados</td></tr>';
+    
+  const esperadoHoy = regHoy.reduce((s,r) => s + Number(r.feria||0) + Number(r.cochera||0), 0);
+  const pendienteHoy = regHoy.reduce((s,r) => s + (!r.pagoFeria?Number(r.feria)||0:0) + (!r.pagoCochera?Number(r.cochera)||0:0), 0);
+  $('#kpi-hoy').innerHTML = `
+    <div class="kpi"><div class="label">Esperado hoy</div><div class="value">${fmt(esperadoHoy)}</div><div class="sub">Feria + cochera</div></div>
+    <div class="kpi"><div class="label">Cobrado hoy</div><div class="value success">${fmt(cobradoHoy)}</div></div>
+    <div class="kpi"><div class="label">Pendiente hoy</div><div class="value danger">${fmt(pendienteHoy)}</div></div>`;
+}
+
+// ===== MOTOKARES =====
+function renderMotokares(filter='') {
+  const f = filter.toLowerCase();
+  const list = state.motokares.filter(m => !f || (m.placa+' '+m.marca+' '+m.id+' '+m.color).toLowerCase().includes(f));
+  const estadoBadge = { activo:'<span class="badge badge-success">Activo</span>', mantenimiento:'<span class="badge badge-warning">Mantenimiento</span>', inactivo:'<span class="badge badge-muted">Inactivo</span>' };
+  $('#tbl-motokares').innerHTML = list.length ? list.map(m => `
+    <tr><td><strong>${m.id}</strong></td><td>${m.num}</td><td>${esc(m.color)}</td><td>${esc(m.marca)}</td>
+      <td><strong>${esc(m.placa)}</strong></td><td>${esc(m.soat)||'—'}</td><td>${estadoBadge[m.estado]||m.estado}</td>
+      <td>${esc(m.observacion)||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openMotokarModal('${m.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="delMotokar('${m.id}')">🗑️</button></td></tr>`).join('')
+    : '<tr><td colspan="9" class="empty">Sin motokares</td></tr>';
+}
+function openMotokarModal(id) {
+  const m = id ? state.motokares.find(x => x.id === id) : {id:'', num:'', color:'', marca:'', placa:'', soat:'', observacion:'', estado:'activo'};
+  openModal(id ? 'Editar Motokar' : 'Nuevo Motokar', `
+    <div class="form-grid">
+      <div class="form-group"><label>ID</label><input name="id" value="${esc(m.id)}" required ${id?'readonly':''}></div>
+      <div class="form-group"><label>N°</label><input name="num" type="number" value="${m.num||''}"></div>
+      <div class="form-group"><label>Color</label><input name="color" value="${esc(m.color)}"></div>
+      <div class="form-group"><label>Marca</label><input name="marca" value="${esc(m.marca)}"></div>
+      <div class="form-group"><label>Placa</label><input name="placa" value="${esc(m.placa)}" required></div>
+      <div class="form-group"><label>SOAT</label><input name="soat" value="${esc(m.soat)}"></div>
+      <div class="form-group"><label>Estado</label><select name="estado">
+        <option value="activo" ${m.estado==='activo'?'selected':''}>Activo</option>
+        <option value="mantenimiento" ${m.estado==='mantenimiento'?'selected':''}>Mantenimiento</option>
+        <option value="inactivo" ${m.estado==='inactivo'?'selected':''}>Inactivo</option></select></div>
+      <div class="form-group full"><label>Observación</label><textarea name="observacion">${esc(m.observacion)}</textarea></div>
+    </div>`, (data) => {
+      data.num = Number(data.num)||state.motokares.length+1;
+      if (id) Object.assign(m, data); else state.motokares.push(data);
+      save(); renderMotokares(); renderDashboard(); toast('Motokar guardado','success');
+    });
+}
+function delMotokar(id) { 
+  if (state.choferes.some(c => c.motokarId === id)) { toast('No se puede eliminar: hay choferes asignados a este motokar', 'error'); return; }
+  if (!confirm('¿Eliminar este motokar?')) return; 
+  state.motokares = state.motokares.filter(m => m.id !== id); save(); renderMotokares(); renderDashboard(); toast('Motokar eliminado','error'); 
+}
+
+// ===== CHOFERES =====
+function renderChoferes(filter='') {
+  const f = filter.toLowerCase();
+  const list = state.choferes.filter(c => !f || (c.nombre+' '+c.dni+' '+c.id).toLowerCase().includes(f));
+  $('#tbl-choferes').innerHTML = list.length ? list.map(c => {
+    const s = saldoChofer(c.id);
+    return `<tr><td><strong>${c.id}</strong></td><td>${esc(c.dni)||'—'}</td><td><strong>${esc(c.nombre)}</strong></td>
+      <td>${esc(c.celular)||'—'}</td>
+      <td>${c.motokarId ? esc(motokarLabel(c.motokarId)) : '<span class="text-muted">Sin asignar</span>'}</td>
+      <td class="num ${s.total>0?'text-danger':'text-success'}">${fmt(s.total)}</td>
+      <td>
+        <button class="btn btn-primary btn-sm" onclick="openCuentaChofer('${c.id}')">📋 Cuenta</button>
+        <button class="btn btn-ghost btn-sm" onclick="openChoferModal('${c.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="delChofer('${c.id}')">🗑️</button>
+      </td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Sin choferes</td></tr>';
+}
+function openChoferModal(id) {
+  const c = id ? state.choferes.find(x => x.id === id) : {id:'', dni:'', nombre:'', celular:'', direccion:'', licencia:'', fechaInicio:'', observaciones:'', motokarId:''};
+  const motoOpts = '<option value="">— Sin asignar —</option>' + state.motokares.map(m => `<option value="${m.id}" ${c.motokarId===m.id?'selected':''}>${m.placa} (${m.id})</option>`).join('');
+  openModal(id ? 'Editar Chofer' : 'Nuevo Chofer', `
+    <div class="form-grid">
+      <div class="form-group"><label>ID</label><input name="id" value="${esc(c.id)}" required ${id?'readonly':''}></div>
+      <div class="form-group"><label>DNI</label><input name="dni" value="${esc(c.dni)}"></div>
+      <div class="form-group full"><label>Nombre completo</label><input name="nombre" value="${esc(c.nombre)}" required></div>
+      <div class="form-group"><label>Celular</label><input name="celular" value="${esc(c.celular)}"></div>
+      <div class="form-group"><label>Licencia</label><input name="licencia" value="${esc(c.licencia)}"></div>
+      <div class="form-group full"><label>Dirección</label><input name="direccion" value="${esc(c.direccion)}"></div>
+      <div class="form-group"><label>Fecha de inicio</label><input name="fechaInicio" type="date" value="${c.fechaInicio||''}"></div>
+      <div class="form-group"><label>Motokar asignado</label><select name="motokarId">${motoOpts}</select></div>
+      <div class="form-group full"><label>Observaciones</label><textarea name="observaciones">${esc(c.observaciones)}</textarea></div>
+    </div>`, (data) => {
+      if (id) Object.assign(c, data); else state.choferes.push(data);
+      save(); renderChoferes(); renderDashboard(); toast('Chofer guardado','success');
+    });
+}
+function delChofer(id) { 
+  if (state.registros.some(r => r.choferId === id)) { toast('No se puede eliminar: tiene registros asociados', 'error'); return; }
+  if (!confirm('¿Eliminar este chofer?')) return; 
+  state.choferes = state.choferes.filter(c => c.id !== id); save(); renderChoferes(); renderDashboard(); toast('Chofer eliminado','error'); 
+}
+
+// ===== CUENTA CORRIENTE =====
+function openCuentaChofer(choferId) {
+  const c = state.choferes.find(x => x.id === choferId);
+  if (!c) return;
+  const movs = movimientosChofer(choferId);
+  let saldo = 0;
+  const rows = movs.map(m => {
+    saldo += m.cargo - m.abono;
+    return `<tr>
+      <td>${m.fecha}</td>
+      <td>${esc(m.concepto)}</td>
+      <td class="num">${m.cargo ? fmt(m.cargo) : '—'}</td>
+      <td class="num text-success">${m.abono ? '−' + fmt(m.abono) : '—'}</td>
+      <td class="num ${saldo>0?'text-danger':saldo<0?'text-success':''}">${fmt(saldo)}</td>
+    </tr>`;
+  }).join('');
+  const saldoFinal = movs.reduce((s,m) => s + m.cargo - m.abono, 0);
+  
+  openModalInfo(`📋 Cuenta corriente · ${esc(c.nombre)}`, `
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi"><div class="label">Saldo actual</div><div class="value ${saldoFinal>0?'danger':saldoFinal<0?'success':''}">${fmt(saldoFinal)}</div></div>
+      <div class="kpi"><div class="label">Motokar</div><div class="value" style="font-size:1.1rem">${c.motokarId ? esc(motokarLabel(c.motokarId)) : 'Sin asignar'}</div></div>
+    </div>
+    <div class="table-wrap" style="max-height:400px;overflow-y:auto"><table>
+      <thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Cargo</th><th class="num">Abono</th><th class="num">Saldo</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty">Sin movimientos registrados</td></tr>'}</tbody>
+    </table></div>
+    <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-success" onclick="openAbonoModal('${choferId}')">💵 Registrar abono</button>
+    </div>
+  `);
+}
+
+// ===== REGISTROS =====
+function renderRegistros() {
+  const fecha = $('#filtro-fecha-reg').value;
+  const cerrado = fecha && isCerrado(fecha);
+  
+  // Alerta de día cerrado
+  $('#reg-alerta-cerrado').innerHTML = cerrado 
+    ? '<div class="alert alert-success">✅ Este día está cerrado. Los movimientos están bloqueados. Reábrelo desde Cierre de Caja si necesitas corregir algo.</div>' 
+    : '';
+  
+  const list = state.registros.filter(r => !fecha || r.fecha === fecha).sort((a,b) => b.fecha.localeCompare(a.fecha));
+  
+  const dateRef = fecha || today();
+  const regsRef = state.registros.filter(r => r.fecha === dateRef);
+  const esperado = regsRef.reduce((s,r) => s + Number(r.feria||0) + Number(r.cochera||0), 0);
+  const cobrado = regsRef.reduce((s,r) => s + (r.pagoFeria?Number(r.feria)||0:0) + (r.pagoCochera?Number(r.cochera)||0:0), 0);
+  const pendiente = esperado - cobrado;
+  
+  $('#kpi-registros-hoy').innerHTML = `
+    <div class="kpi"><div class="label">Esperado ${fecha ? 'el ' + fecha : 'hoy'}</div><div class="value">${fmt(esperado)}</div><div class="sub">Feria + cochera</div></div>
+    <div class="kpi"><div class="label">Cobrado</div><div class="value success">${fmt(cobrado)}</div></div>
+    <div class="kpi"><div class="label">Pendiente</div><div class="value danger">${fmt(pendiente)}</div></div>
+  `;
+
+  $('#tbl-registros').innerHTML = list.length ? list.map(r => {
+    const rowCerrado = isCerrado(r.fecha);
+    return `<tr><td>${r.fecha} ${rowCerrado ? '<span class="lock-icon">🔒</span>' : ''}</td>
+      <td>${esc(choferNombre(r.choferId))}</td>
+      <td>${r.motokarId ? esc(motokarLabel(r.motokarId)) : '—'}</td>
+      <td class="num">${fmt(r.feria)}</td>
+      <td>${r.pagoFeria ? '<span class="badge badge-success">Pagó</span>' : '<span class="badge badge-danger">Debe</span>'}</td>
+      <td class="num">${fmt(r.cochera)}</td>
+      <td>${r.pagoCochera ? '<span class="badge badge-success">Pagó</span>' : '<span class="badge badge-danger">Debe</span>'}</td>
+      <td class="num">${fmt(r.debe)}</td><td class="num">${fmt(r.adicional)}</td>
+      <td class="num text-success">${r.abono ? '−' + fmt(r.abono) : '—'}</td>
+      <td class="num">${fmt(r.aceite)}</td><td class="num">${fmt(r.repuestos)}</td>
+      <td>${esc(r.observacion)||'—'}</td>
+      <td>${rowCerrado ? '<span class="text-muted" style="font-size:.8rem">Bloqueado</span>' : `
+          <button class="btn btn-ghost btn-sm" onclick="openRegistroModal('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="delRegistro('${r.id}')">🗑️</button>`}</td></tr>`;
+  }).join('')
+    : '<tr><td colspan="14" class="empty">Sin registros para esta fecha</td></tr>';
+}
+
+function openRegistroModal(id) {
+  if (id) {
+    const r = state.registros.find(x => x.id === id);
+    if (r && isCerrado(r.fecha)) { toast('Este día está cerrado. Reábrelo para editar.', 'error'); return; }
+  }
+  const r = id ? state.registros.find(x => x.id === id) : {
+    id:'', fecha: today(), choferId:'', motokarId:'', 
+    feria: state.config.feriaDefault, cochera: state.config.cocheraDefault, 
+    pagoFeria: false, pagoCochera: false, debe:0, adicional:0, abono:0, aceite:0, repuestos:0, observacion:''
+  };
+  
+  if (!id && isCerrado(r.fecha)) { toast('La fecha de hoy está cerrada. Reábrela primero.', 'error'); return; }
+  
+  const choferOpts = '<option value="">— Selecciona —</option>' + state.choferes.map(c => `<option value="${c.id}" ${r.choferId===c.id?'selected':''}>${esc(c.nombre)} (${c.id})</option>`).join('');
+  const motoOpts = '<option value="">— Selecciona —</option>' + state.motokares.map(m => `<option value="${m.id}" ${r.motokarId===m.id?'selected':''}>${m.placa} (${m.id})</option>`).join('');
+  
+  openModal(id ? 'Editar Registro' : 'Nuevo Registro Diario', `
+    <div class="form-grid">
+      <div class="form-group"><label>Fecha</label><input name="fecha" type="date" value="${r.fecha}" required></div>
+      <div class="form-group"><label>Chofer</label><select name="choferId" required>${choferOpts}</select></div>
+      <div class="form-group"><label>Motokar</label><select name="motokarId">${motoOpts}</select></div>
+      <div class="form-group"><label>Feria (S/)</label><input name="feria" type="number" step="0.01" value="${r.feria}"></div>
+      <div class="form-group"><label>Cochera (S/)</label><input name="cochera" type="number" step="0.01" value="${r.cochera}"></div>
+      <div class="form-group"></div>
+      <div class="form-group checkbox-row"><input type="checkbox" name="pagoFeria" id="pf" ${r.pagoFeria?'checked':''}><label for="pf">✅ Feria pagada</label></div>
+      <div class="form-group checkbox-row"><input type="checkbox" name="pagoCochera" id="pc" ${r.pagoCochera?'checked':''}><label for="pc">✅ Cochera pagada</label></div>
+      <div class="form-group"><label>Debe (deuda extra)</label><input name="debe" type="number" step="0.01" value="${r.debe}"></div>
+      <div class="form-group"><label>Adicional (cobro extra)</label><input name="adicional" type="number" step="0.01" value="${r.adicional}"></div>
+      <div class="form-group"><label>Abono a deuda anterior (S/)</label><input name="abono" type="number" step="0.01" value="${r.abono||0}"></div>
+      <div class="form-group"><label>Cambio de aceite (S/)</label><input name="aceite" type="number" step="0.01" value="${r.aceite}"></div>
+      <div class="form-group"><label>Gastos repuestos (S/)</label><input name="repuestos" type="number" step="0.01" value="${r.repuestos}"></div>
+      <div class="form-group full"><label>Observación</label><textarea name="observacion">${esc(r.observacion)}</textarea></div>
+    </div>`, (data) => {
+      ['feria','cochera','debe','adicional','abono','aceite','repuestos'].forEach(k => data[k] = Number(data[k])||0);
+      data.pagoFeria = !!data.pagoFeria; data.pagoCochera = !!data.pagoCochera;
+      if (id) Object.assign(r, data); else state.registros.push({...data, id: uid('REG')});
+      save(); renderRegistros(); renderDashboard(); toast('Registro guardado','success');
+    });
+}
+function delRegistro(id) { 
+  const r = state.registros.find(x => x.id === id);
+  if (r && isCerrado(r.fecha)) { toast('No se puede eliminar: día cerrado.', 'error'); return; }
+  if (!confirm('¿Eliminar este registro?')) return; 
+  state.registros = state.registros.filter(x => x.id !== id); save(); renderRegistros(); renderDashboard(); toast('Registro eliminado','error'); 
+}
+
+// ===== REGISTRO RÁPIDO =====
+function openRegistroRapido() {
+  const fecha = today();
+  if (isCerrado(fecha)) { toast('El día de hoy ya está cerrado', 'error'); return; }
+  
+  const choferes = state.choferes.filter(c => c.motokarId || true); // todos
+  if (!choferes.length) { toast('No hay choferes registrados', 'error'); return; }
+  
+  const rowsHtml = choferes.map(c => {
+    const reg = state.registros.find(r => r.fecha === fecha && r.choferId === c.id);
+    const trabajó = reg ? true : true; // por defecto sí
+    const pf = reg ? reg.pagoFeria : false;
+    const pc = reg ? reg.pagoCochera : false;
+    const ab = reg ? (reg.abono||0) : 0;
+    return `
+      <div class="quick-reg-row" data-chofer="${c.id}">
+        <div>
+          <input type="checkbox" name="tra_${c.id}" ${trabajó?'checked':''} id="tra_${c.id}">
+          <label for="tra_${c.id}" style="cursor:pointer;margin-left:4px"><strong>${esc(c.nombre)}</strong></label>
+          <div class="qr-moto">${c.motokarId ? esc(motokarLabel(c.motokarId)) : 'Sin motokar'}</div>
+        </div>
+        <div style="text-align:center"><input type="checkbox" name="pf_${c.id}" ${pf?'checked':''} title="Feria pagada"></div>
+        <div style="text-align:center"><input type="checkbox" name="pc_${c.id}" ${pc?'checked':''} title="Cochera pagada"></div>
+        <div><input type="number" name="ab_${c.id}" value="${ab}" step="0.01" placeholder="0"></div>
+        <div style="font-size:.8rem;color:var(--muted)">${reg?'Ya registrado':'Nuevo'}</div>
+      </div>`;
+  }).join('');
+  
+  openModalInfo('⚡ Registro rápido del día · ' + fecha, `
+    <div class="alert alert-info" style="font-size:.85rem">
+      Marca quién trabajó hoy y qué pagó. Los choferes con "Trabajó" marcado recibirán un cargo por feria y cochera. Puedes desmarcar a quienes no trabajaron.
+    </div>
+    <div class="quick-reg-header" style="display:grid;grid-template-columns:240px 100px 80px 80px 120px;gap:10px">
+      <div>Chofer</div><div style="text-align:center">Feria</div><div style="text-align:center">Cochera</div><div>Abono</div><div></div>
+    </div>
+    <div id="quick-reg-list" style="max-height:50vh;overflow-y:auto">${rowsHtml}</div>
+    <div class="modal-actions" style="margin-top:20px">
+      <button type="button" class="btn btn-ghost" onclick="marcarTodoPagadoRapido()">✅ Marcar todos pagados</button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="guardarRegistroRapido()">💾 Guardar registros</button>
+    </div>
+  `);
+}
+
+function marcarTodoPagadoRapido() {
+  document.querySelectorAll('#quick-reg-list input[type="checkbox"]').forEach(cb => { if (cb.name.startsWith('pf_') || cb.name.startsWith('pc_')) cb.checked = true; });
+}
+
+function guardarRegistroRapido() {
+  const fecha = today();
+  if (isCerrado(fecha)) { toast('El día está cerrado', 'error'); return; }
+  
+  let creados = 0, actualizados = 0, omitidos = 0;
+  
+  document.querySelectorAll('#quick-reg-list .quick-reg-row').forEach(row => {
+    const choferId = row.dataset.chofer;
+    const trabajo = row.querySelector(`input[name="tra_${choferId}"]`).checked;
+    if (!trabajo) { omitidos++; return; }
+    
+    const pf = row.querySelector(`input[name="pf_${choferId}"]`).checked;
+    const pc = row.querySelector(`input[name="pc_${choferId}"]`).checked;
+    const ab = Number(row.querySelector(`input[name="ab_${choferId}"]`).value)||0;
+    
+    const chofer = state.choferes.find(c => c.id === choferId);
+    const existente = state.registros.find(r => r.fecha === fecha && r.choferId === choferId);
+    
+    if (existente) {
+      existente.pagoFeria = pf;
+      existente.pagoCochera = pc;
+      existente.abono = ab;
+      actualizados++;
+    } else {
+      state.registros.push({
+        id: uid('REG'), fecha, choferId, motokarId: chofer.motokarId || '',
+        feria: state.config.feriaDefault, cochera: state.config.cocheraDefault,
+        pagoFeria: pf, pagoCochera: pc, debe: 0, adicional: 0, abono: ab,
+        aceite: 0, repuestos: 0, observacion: ''
+      });
+      creados++;
+    }
+  });
+  
+  save();
+  renderRegistros(); renderDashboard();
+  closeModal();
+  toast(`✅ ${creados} creados, ${actualizados} actualizados, ${omitidos} omitidos`, 'success');
+}
+
+// ===== CARGOS =====
+function renderCargos() {
+  const list = [...state.cargos].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  $('#tbl-cargos').innerHTML = list.length ? list.map(c => `
+    <tr><td>${c.fecha}</td><td>${esc(choferNombre(c.choferId))}</td><td>${esc(c.concepto)}</td>
+      <td class="num">${fmt(c.monto)}</td>
+      <td>${c.pagado ? '<span class="badge badge-success">Pagado</span>' : '<span class="badge badge-danger">Pendiente</span>'}</td>
+      <td>${!c.pagado ? `<button class="btn btn-success btn-sm" onclick="pagarCargo('${c.id}')">💵 Cobrar</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="delCargo('${c.id}')">🗑️</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Sin cargos</td></tr>';
+}
+function openCargoModal() {
+  const choferOpts = '<option value="">— Selecciona —</option>' + state.choferes.map(c => `<option value="${c.id}">${esc(c.nombre)} (${c.id})</option>`).join('');
+  openModal('Nuevo Cargo Adicional', `
+    <div class="form-grid">
+      <div class="form-group"><label>Fecha</label><input name="fecha" type="date" value="${today()}" required></div>
+      <div class="form-group"><label>Chofer</label><select name="choferId" required>${choferOpts}</select></div>
+      <div class="form-group full"><label>Concepto</label><input name="concepto" placeholder="Ej: Préstamo, multa, adelanto..." required></div>
+      <div class="form-group"><label>Monto (S/)</label><input name="monto" type="number" step="0.01" required min="0.01"></div>
+    </div>`, (data) => {
+      state.cargos.push({...data, id: uid('CAR'), monto: Number(data.monto)||0, pagado: false});
+      save(); renderCargos(); renderDashboard(); toast('Cargo registrado','success');
+    });
+}
+function pagarCargo(id) { 
+  if (isCerrado(today())) { toast('El día de hoy está cerrado. Reábrelo para registrar pagos.', 'error'); return; }
+  const c = state.cargos.find(x => x.id === id); 
+  if (c) { c.pagado = true; c.fechaPago = today(); save(); renderCargos(); renderDashboard(); toast('Cargo cobrado','success'); } 
+}
+function delCargo(id) { if (!confirm('¿Eliminar este cargo?')) return; state.cargos = state.cargos.filter(c => c.id !== id); save(); renderCargos(); renderDashboard(); toast('Cargo eliminado','error'); }
+
+// ===== ABONOS =====
+function renderAbonos() {
+  const list = [...state.abonos].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  $('#tbl-abonos').innerHTML = list.length ? list.map(a => `
+    <tr><td>${a.fecha}</td><td>${esc(choferNombre(a.choferId))}</td><td>${esc(a.concepto)||'Abono'}</td>
+      <td class="num text-success">${fmt(a.monto)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delAbono('${a.id}')">🗑️</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty">Sin abonos registrados</td></tr>';
+}
+function openAbonoModal(choferId) {
+  const choferOpts = choferId 
+    ? `<option value="${choferId}" selected>${esc(choferNombre(choferId))}</option>` 
+    : state.choferes.map(c => `<option value="${c.id}">${esc(c.nombre)} (${c.id})</option>`).join('');
+  openModal('Registrar Abono a Deuda', `
+    <div class="alert alert-info" style="font-size:.85rem">
+      Un abono reduce la deuda acumulada del chofer. Úsalo cuando el chofer entregue dinero para pagar deudas anteriores.
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Fecha</label><input name="fecha" type="date" value="${today()}" required></div>
+      <div class="form-group"><label>Chofer</label><select name="choferId" required>${choferOpts}</select></div>
+      <div class="form-group"><label>Monto (S/)</label><input name="monto" type="number" step="0.01" required min="0.01"></div>
+      <div class="form-group"><label>Concepto</label><input name="concepto" value="Abono a deuda" placeholder="Abono"></div>
+    </div>
+  `, (data) => {
+    data.monto = Number(data.monto)||0;
+    state.abonos.push({...data, id: uid('ABO')});
+    save(); renderAbonos(); renderChoferes(); renderDashboard(); renderCaja();
+    toast('Abono registrado', 'success');
+  });
+}
+function delAbono(id) { if (!confirm('¿Eliminar este abono?')) return; state.abonos = state.abonos.filter(a => a.id !== id); save(); renderAbonos(); renderChoferes(); renderDashboard(); toast('Abono eliminado','error'); }
+
+// ===== MANTENIMIENTOS =====
+function renderMantenimientos() {
+  const list = [...state.mantenimientos].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  $('#tbl-mantenimientos').innerHTML = list.length ? list.map(m => `
+    <tr><td>${m.fecha}</td><td>${m.motokarId ? esc(motokarLabel(m.motokarId)) : '—'}</td>
+      <td>${esc(choferNombre(m.choferId))}</td><td class="num">${fmt(m.aceite)}</td>
+      <td class="num">${fmt(m.repuestos)}</td><td>${esc(m.observacion)||'—'}</td>
+      <td class="num">${fmt(m.adicional)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delMantenimiento('${m.id}')">🗑️</button></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">Sin mantenimientos</td></tr>';
+}
+function openMantenimientoModal() {
+  const choferOpts = '<option value="">— Ninguno —</option>' + state.choferes.map(c => `<option value="${c.id}">${esc(c.nombre)} (${c.id})</option>`).join('');
+  const motoOpts = '<option value="">— Selecciona —</option>' + state.motokares.map(m => `<option value="${m.id}">${m.placa} (${m.id})</option>`).join('');
+  openModal('Nuevo Mantenimiento', `
+    <div class="form-grid">
+      <div class="form-group"><label>Fecha</label><input name="fecha" type="date" value="${today()}" required></div>
+      <div class="form-group"><label>Motokar</label><select name="motokarId" required>${motoOpts}</select></div>
+      <div class="form-group"><label>Chofer</label><select name="choferId">${choferOpts}</select></div>
+      <div class="form-group"><label>Cambio de aceite (S/)</label><input name="aceite" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Gastos repuestos (S/)</label><input name="repuestos" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Adicional (S/)</label><input name="adicional" type="number" step="0.01" value="0"></div>
+      <div class="form-group full"><label>Observación</label><textarea name="observacion"></textarea></div>
+    </div>`, (data) => {
+      ['aceite','repuestos','adicional'].forEach(k => data[k] = Number(data[k])||0);
+      state.mantenimientos.push({...data, id: uid('MNT')});
+      save(); renderMantenimientos(); toast('Mantenimiento guardado','success');
+    });
+}
+function delMantenimiento(id) { if (!confirm('¿Eliminar este mantenimiento?')) return; state.mantenimientos = state.mantenimientos.filter(m => m.id !== id); save(); renderMantenimientos(); toast('Mantenimiento eliminado','error'); }
+
+// ===== CAJA =====
+const DENOMS = { monedas:[0.1,0.2,0.5,1,2,5], billetes:[10,20,50,100,200] };
+function getCaja(fecha) { return state.caja.find(c => c.fecha === fecha) || { fecha, denominaciones:{}, yape:[] }; }
+function ensureCaja(fecha) { let c = state.caja.find(x => x.fecha === fecha); if (!c) { c = { fecha, denominaciones:{}, yape:[] }; state.caja.push(c); } return c; }
+function calcEfectivo(fecha) { const d = (getCaja(fecha).denominaciones)||{}; let t=0; DENOMS.monedas.forEach(m => t += m*(Number(d['m'+m])||0)); DENOMS.billetes.forEach(b => t += b*(Number(d['b'+b])||0)); return t; }
+function calcYape(fecha) { return (getCaja(fecha).yape||[]).reduce((s,y) => s + (Number(y.cantidad)||0), 0); }
+function calcCajaTotal(fecha) { return calcEfectivo(fecha) + calcYape(fecha); }
+
+function renderCaja() {
+  const fecha = $('#caja-fecha').value || today();
+  const cerrado = isCerrado(fecha);
+  const cierre = cierreFor(fecha);
+  const caja = getCaja(fecha); const denoms = caja.denominaciones || {};
+  
+  // Estado
+  $('#caja-estado').innerHTML = cerrado 
+    ? '<span class="badge badge-success">🔒 Cerrado</span>' 
+    : '<span class="badge badge-warning">Abierto</span>';
+  
+  // Alerta
+  $('#caja-alerta-cerrado').innerHTML = cerrado 
+    ? `<div class="alert alert-success">✅ Jornada cerrada el ${new Date(cierre.fechaCierre).toLocaleString('es-PE')}. Los movimientos de este día están bloqueados. Puedes reabrir el día si necesitas corregir algo.</div>` 
+    : '';
+  
+  // Botones
+  $('#btn-cerrar').style.display = cerrado ? 'none' : 'inline-flex';
+  $('#btn-reabrir').style.display = cerrado ? 'inline-flex' : 'none';
+  $('#btn-add-yape').style.display = cerrado ? 'none' : 'inline-flex';
+  
+  // Conteo
+  $('#denoms-monedas').innerHTML = DENOMS.monedas.map(d => {
+    const cant = Number(denoms['m'+d]||0);
+    if (cerrado) return `<div class="denom-row"><span class="denom">S/ ${d.toFixed(2)}</span><span style="text-align:right">${cant}</span><span class="subtotal">${fmt(d*cant)}</span></div>`;
+    return `<div class="denom-row"><span class="denom">S/ ${d.toFixed(2)}</span>
+      <input type="number" min="0" step="1" value="${cant}" onchange="updateDenom('${fecha}','m${d}',this.value)">
+      <span class="subtotal">${fmt(d*cant)}</span></div>`;
+  }).join('');
+  $('#denoms-billetes').innerHTML = DENOMS.billetes.map(d => {
+    const cant = Number(denoms['b'+d]||0);
+    if (cerrado) return `<div class="denom-row"><span class="denom">S/ ${d.toFixed(2)}</span><span style="text-align:right">${cant}</span><span class="subtotal">${fmt(d*cant)}</span></div>`;
+    return `<div class="denom-row"><span class="denom">S/ ${d.toFixed(2)}</span>
+      <input type="number" min="0" step="1" value="${cant}" onchange="updateDenom('${fecha}','b${d}',this.value)">
+      <span class="subtotal">${fmt(d*cant)}</span></div>`;
+  }).join('');
+  
+  const yape = caja.yape || [];
+  $('#yape-list').innerHTML = yape.length ? yape.map((y,i) => `
+    <div class="denom-row" style="grid-template-columns:1fr 1fr 80px 90px 40px;">
+      <input value="${esc(y.nombre)}" placeholder="Nombre" ${cerrado?'readonly':''} onchange="updateYape('${fecha}',${i},'nombre',this.value)">
+      <input value="${esc(y.codigo)}" placeholder="Código" ${cerrado?'readonly':''} onchange="updateYape('${fecha}',${i},'codigo',this.value)">
+      <input value="${esc(y.hora)}" placeholder="Hora" ${cerrado?'readonly':''} onchange="updateYape('${fecha}',${i},'hora',this.value)">
+      <input type="number" step="0.01" value="${y.cantidad||0}" ${cerrado?'readonly':''} onchange="updateYape('${fecha}',${i},'cantidad',this.value)">
+      ${cerrado?'':`<button class="btn btn-danger btn-sm" onclick="delYape('${fecha}',${i})">✕</button>`}
+    </div>`).join('')
+    : '<div class="empty">Sin pagos por Yape</div>';
+  
+  const totalCaja = calcCajaTotal(fecha);
+  const regs = state.registros.filter(r => r.fecha === fecha);
+  const esperado = regs.reduce((s,r) => s + Number(r.feria||0) + Number(r.cochera||0), 0);
+  const cobrado = regs.reduce((s,r) => s + (r.pagoFeria?Number(r.feria)||0:0) + (r.pagoCochera?Number(r.cochera)||0:0), 0);
+  const pendiente = esperado - cobrado;
+  const cargosPagadosHoy = state.cargos.filter(c => c.fechaPago === fecha).reduce((s,c) => s + (Number(c.monto)||0), 0);
+  const abonosHoy = state.abonos.filter(a => a.fecha === fecha).reduce((s,a) => s + (Number(a.monto)||0), 0) 
+    + regs.reduce((s,r) => s + Number(r.abono||0), 0);
+  const totalRecibido = cobrado + cargosPagadosHoy + abonosHoy;
+  const diferencia = totalCaja - totalRecibido;
+  
+  $('#kpi-caja').innerHTML = `
+    <div class="kpi"><div class="label">Total en caja</div><div class="value success">${fmt(totalCaja)}</div><div class="sub">Efectivo + Yape</div></div>
+    <div class="kpi"><div class="label">Rentas esperadas</div><div class="value">${fmt(esperado)}</div><div class="sub">Feria + cochera</div></div>
+    <div class="kpi"><div class="label">Rentas cobradas</div><div class="value success">${fmt(cobrado)}</div></div>
+    <div class="kpi"><div class="label">Rentas pendientes</div><div class="value danger">${fmt(pendiente)}</div></div>
+    <div class="kpi"><div class="label">Otros ingresos</div><div class="value">${fmt(cargosPagadosHoy + abonosHoy)}</div><div class="sub">Cargos + abonos</div></div>
+    <div class="kpi"><div class="label">Diferencia caja</div><div class="value ${diferencia===0?'':(diferencia>0?'success':'danger')}">${fmt(diferencia)}</div><div class="sub">Caja − Recibido</div></div>`;
+  
+  $('#tbl-caja-resumen').innerHTML = `
+    <tr><td>Total efectivo (monedas + billetes)</td><td class="num">${fmt(calcEfectivo(fecha))}</td></tr>
+    <tr><td>Total Yape / transferencias</td><td class="num">${fmt(calcYape(fecha))}</td></tr>
+    <tr><td><strong>Total contado en caja</strong></td><td class="num"><strong>${fmt(totalCaja)}</strong></td></tr>
+    <tr><td colspan="2" style="padding-top:16px"><strong>Desglose de ingresos del día</strong></td></tr>
+    <tr><td>Rentas cobradas (feria + cochera)</td><td class="num">${fmt(cobrado)}</td></tr>
+    <tr><td>Cargos pagados hoy</td><td class="num">${fmt(cargosPagadosHoy)}</td></tr>
+    <tr><td>Abonos a deuda recibidos</td><td class="num">${fmt(abonosHoy)}</td></tr>
+    <tr><td><strong>Total recibido</strong></td><td class="num"><strong>${fmt(totalRecibido)}</strong></td></tr>
+    <tr><td colspan="2" style="padding-top:16px"><strong>Deudas del día</strong></td></tr>
+    <tr><td>Rentas esperadas</td><td class="num">${fmt(esperado)}</td></tr>
+    <tr><td>Rentas cobradas</td><td class="num text-success">${fmt(cobrado)}</td></tr>
+    <tr><td>Rentas pendientes</td><td class="num text-danger">${fmt(pendiente)}</td></tr>
+    <tr><td><strong>Diferencia (caja − recibido)</strong></td><td class="num ${diferencia===0?'':(diferencia>0?'text-success':'text-danger')}"><strong>${fmt(diferencia)}</strong></td></tr>`;
+}
+function updateDenom(fecha, key, value) { if (isCerrado(fecha)) return; const c = ensureCaja(fecha); c.denominaciones[key] = Number(value)||0; save(); renderCaja(); }
+function addYapeRow() { const fecha = $('#caja-fecha').value || today(); if (isCerrado(fecha)) return; ensureCaja(fecha).yape.push({hora:'',nombre:'',codigo:'',cantidad:0}); save(); renderCaja(); }
+function updateYape(fecha, idx, field, value) { if (isCerrado(fecha)) return; const c = ensureCaja(fecha); if (field === 'cantidad') value = Number(value)||0; c.yape[idx][field] = value; save(); renderCaja(); }
+function delYape(fecha, idx) { if (isCerrado(fecha)) return; ensureCaja(fecha).yape.splice(idx,1); save(); renderCaja(); }
+
+// ===== CIERRE DE JORNADA =====
+function cerrarJornada() {
+  const fecha = $('#caja-fecha').value || today();
+  if (isCerrado(fecha)) { toast('Este día ya está cerrado', 'error'); return; }
+  
+  const regs = state.registros.filter(r => r.fecha === fecha);
+  const esperado = regs.reduce((s,r) => s + Number(r.feria||0) + Number(r.cochera||0), 0);
+  const cobrado = regs.reduce((s,r) => s + (r.pagoFeria?Number(r.feria)||0:0) + (r.pagoCochera?Number(r.cochera)||0:0), 0);
+  const pendiente = esperado - cobrado;
+  const totalCaja = calcCajaTotal(fecha);
+  
+  if (!confirm(`¿Cerrar la jornada del ${fecha}?\n\nResumen:\n- Rentas esperadas: ${fmt(esperado)}\n- Rentas cobradas: ${fmt(cobrado)}\n- Pendiente: ${fmt(pendiente)}\n- Total en caja: ${fmt(totalCaja)}\n\nSe generará:\n- Reporte Excel del día\n- Respaldo JSON completo\n\nDespués del cierre, los movimientos de este día quedarán bloqueados.`)) return;
+  
+  const cierre = {
+    fecha,
+    fechaCierre: new Date().toISOString(),
+    esperado, cobrado, pendiente, totalCaja,
+    numRegistros: regs.length
+  };
+  state.cierres = state.cierres.filter(c => c.fecha !== fecha);
+  state.cierres.push(cierre);
+  save();
+  
+  // Generar archivos
+  exportCierreDia(fecha);
+  exportJSON(`MotoGest_Backup_${fecha}.json`);
+  
+  renderCaja();
+  renderRegistros();
+  toast('✅ Jornada cerrada. Archivos generados.', 'success');
+}
+
+function reabrirJornada() {
+  const fecha = $('#caja-fecha').value || today();
+  if (!isCerrado(fecha)) { toast('Este día no está cerrado', 'error'); return; }
+  if (!confirm(`¿Reabrir la jornada del ${fecha}?\n\nEsto permitirá modificar los movimientos de ese día.`)) return;
+  state.cierres = state.cierres.filter(c => c.fecha !== fecha);
+  save();
+  renderCaja();
+  renderRegistros();
+  renderConfiguracion();
+  toast('Jornada reabierta', 'success');
+}
+
+// ===== CONFIGURACIÓN =====
+function renderConfiguracion() {
+  const size = new Blob([JSON.stringify(state)]).size;
+  const kb = (size / 1024).toFixed(1);
+  const cierres = state.cierres || [];
+  const sortedCierres = [...cierres].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  const lastCierre = sortedCierres[0];
+  
+  $('#config-info').innerHTML = `
+    <p><strong>Almacenamiento actual:</strong> ${kb} KB en este navegador</p>
+    <p><strong>Cierres guardados:</strong> ${cierres.length}</p>
+    <p><strong>Último cierre:</strong> ${lastCierre ? lastCierre.fecha : 'Ninguno'}</p>
+    <p><strong>Motokares:</strong> ${state.motokares.length} · <strong>Choferes:</strong> ${state.choferes.length} · <strong>Registros:</strong> ${state.registros.length}</p>
+  `;
+  
+  $('#tbl-historial-cierres').innerHTML = sortedCierres.length ? sortedCierres.map(c => `
+    <tr>
+      <td><strong>${c.fecha}</strong></td>
+      <td>${new Date(c.fechaCierre).toLocaleString('es-PE')}</td>
+      <td class="num">${fmt(c.esperado)}</td>
+      <td class="num text-success">${fmt(c.cobrado)}</td>
+      <td class="num ${c.pendiente>0?'text-danger':''}">${fmt(c.pendiente)}</td>
+      <td class="num">${fmt(c.totalCaja)}</td>
+      <td class="num ${c.totalCaja-c.cobrado===0?'':(c.totalCaja>c.cobrado?'text-success':'text-danger')}">${fmt(c.totalCaja-c.cobrado)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="reDescargarCierre('${c.fecha}')" title="Descargar de nuevo">📥</button>
+        <button class="btn btn-ghost btn-sm" onclick="reabrirDiaDesdeHistorial('${c.fecha}')" title="Reabrir día">🔓</button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" class="empty">Sin cierres registrados</td></tr>';
+}
+
+function reDescargarCierre(fecha) {
+  exportCierreDia(fecha);
+  toast('Reporte regenerado', 'success');
+}
+
+function reabrirDiaDesdeHistorial(fecha) {
+  if (!confirm(`¿Reabrir la jornada del ${fecha}?`)) return;
+  state.cierres = state.cierres.filter(c => c.fecha !== fecha);
+  save();
+  renderConfiguracion();
+  renderCaja();
+  renderRegistros();
+  toast('Jornada reabierta', 'success');
+}
+
+// ===== MODAL =====
+function openModal(title, bodyHtml, onSubmit) {
+  $('#modal-content').classList.remove('modal-wide');
+  $('#modal-title').textContent = title;
+  const form = $('#modal-form');
+  form.style.display = 'block';
+  form.innerHTML = bodyHtml + `<div class="modal-actions"><button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>`;
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const data = {};
+    new FormData(form).forEach((v,k) => {
+      const input = form.querySelector(`[name="${k}"]`);
+      if (input && input.type === 'checkbox') data[k] = input.checked; else data[k] = v;
+    });
+    form.querySelectorAll('input[type="checkbox"]').forEach(cb => { if (!(cb.name in data)) data[cb.name] = cb.checked; });
+    onSubmit(data); closeModal();
+  };
+  $('#modal').classList.add('open');
+}
+
+function openModalInfo(title, html) {
+  $('#modal-content').classList.add('modal-wide');
+  $('#modal-title').textContent = title;
+  const form = $('#modal-form');
+  form.style.display = 'none';
+  form.onsubmit = null;
+  // Insertar HTML después del form
+  let infoDiv = document.getElementById('modal-info');
+  if (!infoDiv) { infoDiv = document.createElement('div'); infoDiv.id = 'modal-info'; form.parentElement.appendChild(infoDiv); }
+  infoDiv.innerHTML = html;
+  $('#modal').classList.add('open');
+}
+
+function closeModal() { 
+  $('#modal').classList.remove('open'); 
+  $('#modal-form').innerHTML = ''; 
+  $('#modal-form').style.display = 'block';
+  $('#modal-content').classList.remove('modal-wide');
+  const infoDiv = document.getElementById('modal-info');
+  if (infoDiv) infoDiv.innerHTML = '';
+}
+
+// ===== EXPORTACIONES =====
+function exportJSON(customName) {
+  const name = customName || `MotoGest_Backup_${today()}.json`;
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+  const dlAnchorElem = document.createElement('a');
+  dlAnchorElem.setAttribute("href", dataStr);
+  dlAnchorElem.setAttribute("download", name);
+  dlAnchorElem.click();
+  toast('Respaldo JSON generado', 'success');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== 'object' || !Array.isArray(data.motokares) || !Array.isArray(data.choferes)) {
+        toast('El archivo no parece ser un respaldo válido de MotoGest', 'error');
+        event.target.value = '';
+        return;
+      }
+      const summary = `Motokares: ${data.motokares.length}\nChoferes: ${data.choferes.length}\nRegistros: ${(data.registros||[]).length}\nCargos: ${(data.cargos||[]).length}\nAbonos: ${(data.abonos||[]).length}\nMantenimientos: ${(data.mantenimientos||[]).length}\nCierres: ${(data.cierres||[]).length}`;
+      
+      if (!confirm(`⚠️ IMPORTANTE\n\nSe reemplazarán TODOS los datos actuales por los del respaldo.\n\nEl respaldo contiene:\n${summary}\n\n¿Deseas continuar?`)) {
+        event.target.value = '';
+        return;
+      }
+      
+      // Backup de seguridad
+      const safetyKey = STORAGE_KEY + '_before_import_' + Date.now();
+      localStorage.setItem(safetyKey, JSON.stringify(state));
+      
+      state = {
+        motokares: data.motokares || [],
+        choferes: data.choferes || [],
+        registros: data.registros || [],
+        cargos: data.cargos || [],
+        abonos: data.abonos || [],
+        mantenimientos: data.mantenimientos || [],
+        caja: data.caja || [],
+        cierres: data.cierres || [],
+        config: data.config || { feriaDefault: 25, cocheraDefault: 3 }
+      };
+      save();
+      toast('Respaldo restaurado correctamente', 'success');
+      setTimeout(() => location.reload(), 800);
+    } catch (err) {
+      toast('Error al leer el archivo: ' + err.message, 'error');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function sheetFromRows(rows, headers) { return XLSX.utils.aoa_to_sheet([headers, ...rows]); }
+
+function exportCierreDia(fecha) {
+  const wb = XLSX.utils.book_new();
+  const regs = state.registros.filter(r => r.fecha === fecha);
+  const cierre = cierreFor(fecha) || {};
+  const cargosHoy = state.cargos.filter(c => c.fechaPago === fecha);
+  const abonosHoy = state.abonos.filter(a => a.fecha === fecha);
+  const cargosPagadosHoy = cargosHoy.reduce((s,c) => s + (Number(c.monto)||0), 0);
+  const abonosRegsHoy = regs.reduce((s,r) => s + Number(r.abono||0), 0);
+  const abonosTotal = abonosHoy.reduce((s,a) => s + (Number(a.monto)||0), 0) + abonosRegsHoy;
+  const cobrado = regs.reduce((s,r) => s + (r.pagoFeria?Number(r.feria)||0:0) + (r.pagoCochera?Number(r.cochera)||0:0), 0);
+  const esperado = regs.reduce((s,r) => s + Number(r.feria||0) + Number(r.cochera||0), 0);
+  
+  // Hoja Resumen
+  const resumenRows = [
+    ['CIERRE DE JORNADA', fecha],
+    [],
+    ['Fecha de cierre', new Date(cierre.fechaCierre || new Date()).toLocaleString('es-PE')],
+    [],
+    ['RESUMEN DE RENTAS'],
+    ['Rentas esperadas (feria + cochera)', esperado],
+    ['Rentas cobradas', cobrado],
+    ['Rentas pendientes', esperado - cobrado],
+    [],
+    ['OTROS INGRESOS'],
+    ['Cargos adicionales cobrados', cargosPagadosHoy],
+    ['Abonos a deuda recibidos', abonosTotal],
+    [],
+    ['TOTALES'],
+    ['Total recibido (rentas + otros)', cobrado + cargosPagadosHoy + abonosTotal],
+    ['Total contado en caja', calcCajaTotal(fecha)],
+    ['Diferencia (caja - recibido)', calcCajaTotal(fecha) - (cobrado + cargosPagadosHoy + abonosTotal)],
+    [],
+    ['ESTADÍSTICAS'],
+    ['Número de registros del día', regs.length],
+    ['Cargos cobrados', cargosHoy.length],
+    ['Abonos registrados', abonosHoy.length]
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenRows), 'Resumen');
+  
+  // Hoja Registros
+  const regHeaders = ['Fecha','Chofer','Motokar','Feria','Pagó Feria','Cochera','Pagó Cochera','Debe','Adicional','Abono','Aceite','Repuestos','Observación'];
+  const regRows = regs.map(r => [r.fecha, choferNombre(r.choferId), motokarLabel(r.motokarId), r.feria, r.pagoFeria?'Sí':'No', r.cochera, r.pagoCochera?'Sí':'No', r.debe, r.adicional, r.abono||0, r.aceite, r.repuestos, r.observacion]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([regHeaders, ...regRows]), 'Registros');
+  
+  // Hoja Cargos pagados
+  if (cargosHoy.length) {
+    const cargosHeaders = ['Chofer','Concepto','Monto'];
+    const cargosRows = cargosHoy.map(c => [choferNombre(c.choferId), c.concepto, c.monto]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cargosHeaders, ...cargosRows]), 'Cargos pagados');
+  }
+  
+  // Hoja Abonos
+  if (abonosHoy.length) {
+    const abonosHeaders = ['Chofer','Concepto','Monto'];
+    const abonosRows = abonosHoy.map(a => [choferNombre(a.choferId), a.concepto, a.monto]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([abonosHeaders, ...abonosRows]), 'Abonos');
+  }
+  
+  // Hoja Caja
+  const caja = getCaja(fecha);
+  const cajaRows = [['CONTEO DE EFECTIVO'], ['Denominación','Cantidad','Subtotal']];
+  DENOMS.monedas.forEach(m => { const c = Number((caja.denominaciones||{})['m'+m]||0); if (c) cajaRows.push(['S/ '+m.toFixed(2), c, m*c]); });
+  DENOMS.billetes.forEach(b => { const c = Number((caja.denominaciones||{})['b'+b]||0); if (c) cajaRows.push(['S/ '+b.toFixed(2), c, b*c]); });
+  cajaRows.push([], ['Total efectivo','',calcEfectivo(fecha)]);
+  cajaRows.push([], ['YAPE / TRANSFERENCIAS']);
+  (caja.yape||[]).forEach(y => cajaRows.push([y.nombre, y.codigo, y.cantidad]));
+  cajaRows.push(['Total Yape','',calcYape(fecha)]);
+  cajaRows.push([], ['TOTAL EN CAJA','',calcCajaTotal(fecha)]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cajaRows), 'Caja');
+  
+  XLSX.writeFile(wb, `Cierre_${fecha}.xlsx`);
+}
+
+function exportAll() {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.motokares.map(m => [m.id,m.num,m.color,m.marca,m.placa,m.soat,m.estado,m.observacion]), ['ID','N°','Color','Marca','Placa','SOAT','Estado','Observación']), 'MOTOKARES');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.choferes.map(c => [c.id,c.dni,c.nombre,c.celular,c.direccion,c.licencia,c.fechaInicio,c.motokarId,saldoChofer(c.id).total,c.observaciones]), ['ID','DNI','Nombre','Celular','Dirección','Licencia','Fecha Inicio','Motokar','Saldo','Observaciones']), 'CHOFERES');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.registros.map(r => [r.fecha, r.choferId, choferNombre(r.choferId), r.motokarId, r.feria, r.pagoFeria?'Sí':'No', r.cochera, r.pagoCochera?'Sí':'No', r.debe, r.adicional, r.abono||0, r.aceite, r.repuestos, r.observacion]), ['Fecha','ID Chofer','Chofer','Motokar','Feria','Pagó Feria','Cochera','Pagó Cochera','Debe','Adicional','Abono','Aceite','Repuestos','Observación']), 'REGISTRO DIARIO');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.cargos.map(c => [c.fecha, c.choferId, choferNombre(c.choferId), c.concepto, c.monto, c.pagado?'Pagado':'Pendiente', c.fechaPago||'']), ['Fecha','ID Chofer','Chofer','Concepto','Monto','Estado','Fecha Pago']), 'CARGOS');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.abonos.map(a => [a.fecha, a.choferId, choferNombre(a.choferId), a.concepto||'Abono', a.monto]), ['Fecha','ID Chofer','Chofer','Concepto','Monto']), 'ABONOS');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.mantenimientos.map(m => [m.fecha, m.motokarId, m.choferId, choferNombre(m.choferId), m.aceite, m.repuestos, m.observacion, m.adicional]), ['Fecha','Motokar','Chofer','Nombre','Aceite','Repuestos','Observación','Adicional']), 'MANTENIMIENTO');
+  const cajaRows = [['Fecha','Efectivo','Yape','Total']];
+  state.caja.forEach(c => { const ef = calcEfectivo(c.fecha); const ya = calcYape(c.fecha); cajaRows.push([c.fecha, ef, ya, ef+ya]); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cajaRows), 'CAJA');
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(state.cierres.map(c => [c.fecha, c.fechaCierre, c.esperado, c.cobrado, c.pendiente, c.totalCaja]), ['Fecha','Fecha Cierre','Esperado','Cobrado','Pendiente','Caja']), 'CIERRES');
+  XLSX.writeFile(wb, `MotoGest_${today()}.xlsx`); 
+  toast('Exportación completa generada','success');
+}
+
+function resetData() { 
+  if (!confirm('⚠️ Esto eliminará TODOS los datos guardados.\n\nAsegúrate de tener un respaldo descargado antes de continuar.\n\n¿Continuar?')) return; 
+  if (!confirm('Última confirmación: ¿borrar todos los datos?')) return;
+  localStorage.removeItem(STORAGE_KEY); 
+  location.reload(); 
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  $$('.nav-item').forEach(n => n.addEventListener('click', () => switchView(n.dataset.view)));
+  
+  const hoy = today();
+  $('#caja-fecha').value = hoy;
+  $('#filtro-fecha-reg').value = hoy;
+  
+  renderDashboard();
+});
+document.addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+</script>
+</body>
+</html>
